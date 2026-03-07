@@ -4,7 +4,7 @@ import pytest
 from django.http import Http404
 from django.test import RequestFactory, override_settings
 
-from app.tenants.middleware import TenantMiddleware
+from app.tenants.middleware import TenantMiddleware, _safe_schema
 
 TENANTS_CONFIG = [
     {"slug": "acme", "schema": "acme", "domains": ["acme.localhost"], "demo": False},
@@ -52,3 +52,18 @@ def test_tenant_middleware_path_prefix_takes_priority_over_domain():
     middleware = make_middleware()
     middleware._set_tenant(request)
     assert request.tenant["slug"] == "demo"
+
+
+def test_safe_schema_accepts_valid_name():
+    assert _safe_schema("acme") == "acme"
+    assert _safe_schema("acme_corp") == "acme_corp"
+    assert _safe_schema("tenant123") == "tenant123"
+
+
+def test_safe_schema_rejects_invalid_name():
+    with pytest.raises(ValueError):
+        _safe_schema("'; DROP TABLE users; --")
+    with pytest.raises(ValueError):
+        _safe_schema("123invalid")
+    with pytest.raises(ValueError):
+        _safe_schema("has space")

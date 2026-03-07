@@ -11,9 +11,20 @@ Resolution order:
 
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 from django.db import connection
 from django.http import Http404, HttpRequest, HttpResponse
+
+_VALID_SCHEMA_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _safe_schema(schema: str) -> str:
+    """Validate schema is a safe PostgreSQL identifier before use in SQL."""
+    if not _VALID_SCHEMA_RE.match(schema):
+        raise ValueError(f"Invalid schema name: {schema!r}")
+    return schema
 
 
 class TenantMiddleware:
@@ -31,8 +42,8 @@ class TenantMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         self._set_tenant(request)
         with connection.cursor() as cursor:
-            schema = request.tenant["schema"]
-            cursor.execute(f"SET search_path TO {schema}, public")  # noqa: S608
+            schema = _safe_schema(request.tenant["schema"])
+            cursor.execute(f"SET search_path TO {schema}, public")
         return self.get_response(request)
 
     def _set_tenant(self, request: HttpRequest) -> None:
