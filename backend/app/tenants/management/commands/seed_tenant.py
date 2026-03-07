@@ -12,8 +12,10 @@ from __future__ import annotations
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.db import connection
 
 from app.org.models import Membership, OrgUnit, Role
+from app.tenants.utils import safe_schema
 
 User = get_user_model()
 
@@ -29,6 +31,10 @@ class Command(BaseCommand):
         tenant = next((t for t in settings.TENANTS if t["slug"] == slug), None)
         if tenant is None:
             raise CommandError(f"Tenant '{slug}' not found in TENANTS config.")
+
+        schema = safe_schema(tenant["schema"])
+        with connection.cursor() as cursor:
+            cursor.execute(f"SET search_path TO {schema}, public")
 
         # Root org unit
         corp, _ = OrgUnit.objects.get_or_create(

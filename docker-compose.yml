@@ -34,6 +34,7 @@ services:
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_TENANTS=${TENANTS}
     depends_on:
       - backend
     command: npm run dev

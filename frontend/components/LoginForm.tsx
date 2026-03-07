@@ -3,20 +3,31 @@
 import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 
-export default function LoginPage() {
+interface Props {
+  slug: string;
+}
+
+export default function LoginForm({ slug }: Props) {
   const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/auth/login", {
+    setError(null);
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+    const res = await fetch(`${apiUrl}/t/${slug}/v1/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
+
     if (res.ok) {
-      window.location.href = "/dashboard";
+      window.location.href = `/t/${slug}/dashboard`;
+    } else {
+      setError(t("invalidCredentials"));
     }
   }
 
@@ -40,6 +51,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+        {error && <p role="alert">{error}</p>}
         <button type="submit">{t("login")}</button>
       </form>
     </main>

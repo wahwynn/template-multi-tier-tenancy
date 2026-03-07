@@ -120,6 +120,53 @@ This file is the single source of truth for coding standards, style guides, and 
 
 Once implemented, tests should be runnable with a single command. Ensure all tests pass before pushing. Document the exact command in this file once chosen.
 
+## Multi-Tenant Schema Isolation
+
+This project uses PostgreSQL schema-per-tenant isolation. Every code path that touches the database must operate in the correct tenant schema.
+
+### How tenant context is set
+
+| Context | Mechanism |
+|---------|-----------|
+| HTTP requests | `TenantMiddleware` resolves the tenant from the path prefix (`/t/<slug>/`) or `Host` header and sets `search_path` automatically |
+| Management commands | Must set `search_path` manually — **no middleware runs** |
+| Background tasks / workers | Must set `search_path` manually before any ORM access |
+
+### Rules for management commands
+
+1. **Always resolve the tenant** from `settings.TENANTS` using the slug or schema argument — never hardcode.
+2. **Always call `safe_schema()`** (`from app.tenants.utils import safe_schema`) on the schema name before interpolating it into SQL.
+3. **Always set `search_path` before any ORM query**:
+   ```python
+   from django.db import connection
+   from app.tenants.utils import safe_schema
+
+   schema = safe_schema(tenant["schema"])
+   with connection.cursor() as cursor:
+       cursor.execute(f"SET search_path TO {schema}, public")
+   # All ORM calls below now target the tenant schema
+   ```
+4. **For commands that call `call_command("migrate")`**, bake the schema into the connection options and force a reconnect — a session-level `SET` may not survive Django's internal reconnects:
+   ```python
+   original_options = connection.settings_dict.get("OPTIONS", {}).copy()
+   try:
+       connection.settings_dict.setdefault("OPTIONS", {})
+       connection.settings_dict["OPTIONS"]["options"] = f"-c search_path={schema},public"
+       connection.close()
+       call_command("migrate", ...)
+   finally:
+       connection.settings_dict["OPTIONS"] = original_options
+       connection.close()
+   ```
+5. **Do not add tenant-switching logic to models or serializers** — schema resolution belongs at the command/middleware boundary only.
+
+### Checklist when adding a new management command that touches the DB
+
+- [ ] Accepts a `slug` or `--schema` argument
+- [ ] Calls `safe_schema()` before any SQL interpolation
+- [ ] Sets `search_path` before the first ORM or raw SQL call
+- [ ] Tested with both `acme` and `demo` tenants
+
 ## Adding New Features
 
 Follow the red/green/refactor cycle for every feature:
