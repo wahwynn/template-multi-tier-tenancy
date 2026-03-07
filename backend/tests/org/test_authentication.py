@@ -4,10 +4,10 @@ import hashlib
 import secrets
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
-from app.org.authentication import APIKeyAuthentication, APIKeyToken
+from app.org.authentication import APIKeyAuthentication
 from app.org.models import APIKey, OrgUnit, Role
 
 User = get_user_model()
@@ -53,6 +53,7 @@ class TestAPIKeyAuthentication(TestCase):
     def test_expired_api_key_raises_auth_error(self):
         import pytest
         from rest_framework.exceptions import AuthenticationFailed
+
         self.api_key.expires_at = timezone.now() - timezone.timedelta(hours=1)
         self.api_key.save()
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {self.raw_key}")

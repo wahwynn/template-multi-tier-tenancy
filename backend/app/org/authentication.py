@@ -43,13 +43,13 @@ class APIKeyAuthentication(BaseAuthentication):
         if not header.startswith("Bearer "):
             return None
 
-        raw_key = header[len("Bearer "):]
+        raw_key = header[len("Bearer ") :]
 
         # JWTs contain dots; raw hex keys do not.
         if "." in raw_key:
             return None
 
-        if len(raw_key) < 8:  # noqa: PLR2004
+        if len(raw_key) < 8:
             return None
 
         prefix = raw_key[:8]
@@ -58,9 +58,7 @@ class APIKeyAuthentication(BaseAuthentication):
         from app.org.models import APIKey  # local import avoids circular
 
         try:
-            key = APIKey.objects.select_related("org_unit", "created_by").get(
-                prefix=prefix, hashed_key=hashed
-            )
+            key = APIKey.objects.select_related("org_unit", "created_by").get(prefix=prefix, hashed_key=hashed)
         except APIKey.DoesNotExist:
             return None
 

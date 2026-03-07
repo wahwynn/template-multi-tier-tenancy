@@ -32,11 +32,7 @@ class TenantMiddleware:
 
     @property
     def _by_domain(self) -> dict[str, dict]:
-        return {
-            domain: t
-            for t in settings.TENANTS
-            for domain in t.get("domains", [])
-        }
+        return {domain: t for t in settings.TENANTS for domain in t.get("domains", [])}
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         self._set_tenant(request)

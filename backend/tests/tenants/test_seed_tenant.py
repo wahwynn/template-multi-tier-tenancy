@@ -3,8 +3,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
-from app.tenants.management.commands.seed_tenant import Command
 from app.org.models import OrgUnit
+from app.tenants.management.commands.seed_tenant import Command
 
 User = get_user_model()
 

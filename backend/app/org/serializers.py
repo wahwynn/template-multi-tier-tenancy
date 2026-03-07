@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import secrets
+from typing import ClassVar
 
 from rest_framework import serializers
 
@@ -13,13 +12,13 @@ from app.org.models import APIKey, Membership, OrgUnit
 class OrgUnitSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrgUnit
-        fields = ["id", "name", "slug", "parent", "node_type", "isolation_policy"]
+        fields: ClassVar = ["id", "name", "slug", "parent", "node_type", "isolation_policy"]
 
 
 class MembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Membership
-        fields = ["id", "user", "org_unit", "role"]
+        fields: ClassVar = ["id", "user", "org_unit", "role"]
 
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
@@ -29,7 +28,7 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = APIKey
-        fields = ["id", "name", "org_unit", "role", "expires_at", "raw_key"]
+        fields: ClassVar = ["id", "name", "org_unit", "role", "expires_at", "raw_key"]
 
 
 class APIKeyListSerializer(serializers.ModelSerializer):
@@ -37,4 +36,4 @@ class APIKeyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = APIKey
-        fields = ["id", "name", "prefix", "org_unit", "role", "expires_at", "last_used_at"]
+        fields: ClassVar = ["id", "name", "prefix", "org_unit", "role", "expires_at", "last_used_at"]

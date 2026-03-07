@@ -44,6 +44,6 @@ class Command(BaseCommand):
             try:
                 call_command("migrate", verbosity=options["verbosity"])
                 self.stdout.write(self.style.SUCCESS(f"  '{schema}' OK"))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.stderr.write(self.style.ERROR(f"  '{schema}' FAILED: {exc}"))
                 raise

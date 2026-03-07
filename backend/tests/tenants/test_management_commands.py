@@ -32,6 +32,7 @@ def test_create_tenant_creates_schema_and_runs_migrations(mock_connection, mock_
 @override_settings(TENANTS=TENANTS_CONFIG)
 def test_create_tenant_raises_error_for_unknown_slug():
     from django.core.management.base import CommandError
+
     cmd = CreateTenantCommand()
     with pytest.raises(CommandError):
         cmd.handle(slug="unknown", verbosity=1)

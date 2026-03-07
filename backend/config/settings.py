@@ -56,11 +56,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # --- Database ---
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL", "postgres://app:app@localhost:5432/app")
-    )
-}
+DATABASES = {"default": dj_database_url.parse(os.environ.get("DATABASE_URL", "postgres://app:app@localhost:5432/app"))}
 
 # --- Cache / Sessions ---
 CACHES = {

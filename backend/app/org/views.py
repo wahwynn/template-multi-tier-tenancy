@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from typing import TYPE_CHECKING, ClassVar
 
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination
-from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+if TYPE_CHECKING:
+    from rest_framework.request import Request
 
 from app.org.models import APIKey, Membership, OrgUnit
 from app.org.serializers import (
@@ -36,9 +39,7 @@ class OrgUnitViewSet(ModelViewSet):
     pagination_class = OrgUnitPagination
 
     def _member_unit_ids(self):
-        return Membership.objects.filter(user=self.request.user).values_list(
-            "org_unit_id", flat=True
-        )
+        return Membership.objects.filter(user=self.request.user).values_list("org_unit_id", flat=True)
 
     def get_queryset(self):
         return OrgUnit.objects.filter(pk__in=self._member_unit_ids())
@@ -91,7 +92,7 @@ class MembershipViewSet(ModelViewSet):
 
 
 class APIKeyViewSet(ModelViewSet):
-    http_method_names = ["get", "post", "delete", "head", "options"]
+    http_method_names: ClassVar = ["get", "post", "delete", "head", "options"]
 
     def get_serializer_class(self):
         if self.action == "create":

@@ -1,6 +1,5 @@
 """Tests for OrgUnit model."""
 
-import pytest
 from django.test import TestCase
 
 from app.org.models import IsolationPolicy, OrgUnit
@@ -14,9 +13,7 @@ class TestOrgUnitCreation(TestCase):
 
     def test_create_child_org_unit(self):
         parent = OrgUnit.objects.create(name="Acme Corp", slug="acme", node_type="org")
-        child = OrgUnit.objects.create(
-            name="Engineering", slug="engineering", node_type="department", parent=parent
-        )
+        child = OrgUnit.objects.create(name="Engineering", slug="engineering", node_type="department", parent=parent)
         assert child.parent == parent
 
     def test_isolation_policy_choices(self):
@@ -26,12 +23,8 @@ class TestOrgUnitCreation(TestCase):
 class TestOrgUnitAncestors(TestCase):
     def setUp(self):
         self.corp = OrgUnit.objects.create(name="Corp", slug="corp", node_type="org")
-        self.dept = OrgUnit.objects.create(
-            name="Dept", slug="dept", node_type="department", parent=self.corp
-        )
-        self.team = OrgUnit.objects.create(
-            name="Team", slug="team", node_type="team", parent=self.dept
-        )
+        self.dept = OrgUnit.objects.create(name="Dept", slug="dept", node_type="department", parent=self.corp)
+        self.team = OrgUnit.objects.create(name="Team", slug="team", node_type="team", parent=self.dept)
 
     def test_get_ancestors(self):
         ancestors = self.team.get_ancestors()

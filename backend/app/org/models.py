@@ -13,13 +13,10 @@ Isolation policy controls data visibility across parent/child boundaries:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import ClassVar
 
 from django.contrib.auth import get_user_model
 from django.db import models
-
-if TYPE_CHECKING:
-    from django.db.models import QuerySet
 
 
 class IsolationPolicy(models.TextChoices):
@@ -110,9 +107,7 @@ class Membership(models.Model):
 
     class Meta:
         app_label = "app_org"
-        constraints = [
-            models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")
-        ]
+        constraints: ClassVar = [models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")]
 
     def __str__(self) -> str:
         return f"{self.user} in {self.org_unit} ({self.role})"
@@ -138,9 +133,7 @@ class APIKey(models.Model):
 
     class Meta:
         app_label = "app_org"
-        constraints = [
-            models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")
-        ]
+        constraints: ClassVar = [models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.prefix}...)"

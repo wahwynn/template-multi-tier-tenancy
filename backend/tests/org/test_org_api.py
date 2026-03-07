@@ -15,9 +15,7 @@ TENANTS_CONFIG = [{"slug": "acme", "schema": "acme", "domains": []}]
 class TestOrgUnitAPI(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(
-            username="alice", password="pass", email="alice@example.com"
-        )
+        self.user = User.objects.create_user(username="alice", password="pass", email="alice@example.com")
         self.corp = OrgUnit.objects.create(name="Acme Corp", slug="acme-corp", node_type="org")
         Membership.objects.create(user=self.user, org_unit=self.corp, role=Role.ADMIN)
         self.client.force_authenticate(user=self.user)
@@ -55,7 +53,7 @@ class TestOrgUnitAPI(TestCase):
         assert any(u["slug"] == "acme-corp" for u in response.data)
 
     def test_get_descendants(self):
-        dept = OrgUnit.objects.create(name="Dept", slug="dept", parent=self.corp)
+        OrgUnit.objects.create(name="Dept", slug="dept", parent=self.corp)
         response = self.client.get(f"/t/acme/v1/org/units/{self.corp.pk}/descendants/")
         assert response.status_code == 200
         assert any(u["slug"] == "dept" for u in response.data)

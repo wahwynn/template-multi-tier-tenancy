@@ -54,9 +54,7 @@ class Command(BaseCommand):
             user.set_password("demo-password-change-me")
             user.save()
 
-        Membership.objects.get_or_create(
-            user=user, org_unit=corp, defaults={"role": Role.OWNER}
-        )
+        Membership.objects.get_or_create(user=user, org_unit=corp, defaults={"role": Role.OWNER})
 
         if options["verbosity"] > 0:
             self.stdout.write(self.style.SUCCESS(f"Seeded tenant '{slug}'."))
