@@ -13,9 +13,12 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -69,3 +72,35 @@ class APIKeyAuthentication(BaseAuthentication):
         APIKey.objects.filter(pk=key.pk).update(last_used_at=timezone.now())
 
         return key.created_by, APIKeyToken(key)
+
+
+class EmailAuthBackend:
+    """Django auth backend that accepts email instead of username."""
+
+    def authenticate(self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: object) -> object | None:
+        User = get_user_model()
+        email = kwargs.get("email") or username
+        if not email or not password:
+            return None
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return None
+        return user if user.check_password(password) and user.is_active else None
+
+    def get_user(self, user_id: int) -> object | None:
+        User = get_user_model()
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
+
+
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Accept ``email`` + ``password`` instead of ``username`` + ``password``."""
+
+    username_field = "email"
+
+
+class EmailTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer

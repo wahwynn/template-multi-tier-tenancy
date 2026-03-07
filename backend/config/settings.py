@@ -84,6 +84,7 @@ CACHES = {
 
 # --- Auth ---
 AUTH_USER_MODEL = "auth.User"
+AUTHENTICATION_BACKENDS = ["app.org.authentication.EmailAuthBackend"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
