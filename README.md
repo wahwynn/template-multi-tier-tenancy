@@ -1,65 +1,119 @@
-# Empty Web Application Template
+# Multi-Tenant Application Scaffold
 
-A generic template repository for building web applications. The project type and tech stack are customizable — see [PROJECT.md](PROJECT.md) for current status and configuration options.
+A full-stack scaffold for multi-tenant applications with hierarchical organisational structure.
 
-## Getting Started
+- **Backend**: Django 5 + Django REST Framework
+- **Frontend**: Next.js 15 (App Router) + TypeScript
+- **Database**: PostgreSQL 16 — schema-per-tenant isolation
+- **Cache**: Redis 7
+- **Auth**: JWT + API key authentication
 
-1. **Review the project metadata:**
+See the [design document](docs/plans/2026-03-07-multi-tenant-scaffold-design.md) for full architecture decisions.
 
-   Read [PROJECT.md](PROJECT.md) to understand the current project type and stack decisions.
+## Architecture
 
-2. **Set up environment variables:**
+Each tenant gets an isolated PostgreSQL schema. Tenant configuration lives in the `TENANTS` environment variable (12-factor — no database registry). The middleware resolves the tenant from the request and sets `search_path` accordingly.
 
-   ```bash
-   cp .env.example .env
-   ```
+The org hierarchy is an unlimited-depth tree (`OrgUnit`, self-referential). Each node has an `isolation_policy` controlling data visibility across parent/child boundaries:
 
-3. **Install dependencies:**
+| Policy | Parent sees child | Child sees parent |
+|---|---|---|
+| `open` | yes | yes |
+| `isolated` | no | no |
+| `inherit_only` | no | yes |
+| `visible_only` | yes | no |
 
-   ```bash
-   make install
-   ```
+## Quick Start
 
-4. **Run quality checks:**
+```bash
+# 1. Copy env config
+cp .env.example .env
+# Edit .env — set DJANGO_SECRET_KEY, JWT_SECRET, and review TENANTS
 
-   ```bash
-   make check
-   ```
+# 2. Start services
+docker compose up --build -d
 
-## Available Commands
+# 3. Provision tenant schemas
+docker compose exec backend uv run manage.py create_tenant acme
+docker compose exec backend uv run manage.py create_tenant demo
 
-Run `make help` to see all available commands:
+# 4. Seed demo tenant with sample data
+docker compose exec backend uv run manage.py seed_tenant demo
+```
 
-| Command          | Description                                     |
-| ---------------- | ----------------------------------------------- |
-| `make install`   | Install dependencies                            |
-| `make lint`      | Run linter                                      |
-| `make format`    | Format code and fix auto-fixable lint issues    |
-| `make typecheck` | Run type checker                                |
-| `make test`      | Run test suite                                  |
-| `make check`     | Run all quality gates (lint + typecheck + test) |
-| `make clean`     | Remove build artifacts and caches               |
+- Backend API: http://localhost:8000
+- Frontend: http://localhost:3000
+- Demo tenant (local path prefix): http://localhost:3000/t/demo/dashboard
 
-## Project Structure
+## Tenant Access
 
-See [PROJECT.md](PROJECT.md) for the directory layout and stack decisions.
+Tenants are resolved from the request in this order:
 
-## Conventions
+1. **Path prefix** (local dev): `/t/<slug>/v1/...` → e.g. `http://localhost:8000/t/acme/v1/org/units/`
+2. **Domain** (production): `acme.yourdomain.com` or `app.acme.com` (configured in `TENANTS`)
 
-All coding standards, style guides, and development workflows are documented in [CONVENTIONS.md](CONVENTIONS.md).
+## Tenant Management
 
-## AI Agent Configuration
+```bash
+# Add a new tenant (update TENANTS env var first, then):
+uv run manage.py create_tenant <slug>
 
-This repo includes configuration for multiple AI coding assistants:
+# Apply pending migrations to all tenant schemas (run at every deploy):
+uv run manage.py migrate_tenants
 
-| File                              | Agent          |
-| --------------------------------- | -------------- |
-| `CLAUDE.md`                       | Claude Code    |
-| `.cursorrules`                    | Cursor         |
-| `.github/copilot-instructions.md` | GitHub Copilot |
+# Seed a tenant with demo data:
+uv run manage.py seed_tenant <slug>
+```
 
-All agents follow the shared conventions in `CONVENTIONS.md`.
+## API
 
-## License
+All endpoints are under `/v1/`. Tenant context is resolved from the request — never passed in the URL or request body.
 
-See [LICENSE](LICENSE) for details.
+```
+POST   /v1/auth/token/                          obtain JWT
+POST   /v1/auth/token/refresh/                  refresh JWT
+
+GET    /v1/org/units/                           list accessible org units
+POST   /v1/org/units/                           create org unit
+GET    /v1/org/units/{id}/                      get org unit
+GET    /v1/org/units/{id}/ancestors/            walk up the tree
+GET    /v1/org/units/{id}/descendants/          walk down the tree
+GET    /v1/org/units/{id}/members/              list members
+POST   /v1/org/units/{id}/members/              add member
+GET    /v1/org/units/{id}/api-keys/             list API keys
+POST   /v1/org/units/{id}/api-keys/             create API key (key shown once)
+DELETE /v1/org/units/{id}/api-keys/{kid}/       revoke API key
+```
+
+All error responses follow: `{"error": {"code": "...", "message": "..."}}`
+
+## Running Tests
+
+```bash
+# Backend
+cd backend && uv run pytest
+
+# Frontend
+cd frontend && npm test
+```
+
+## Environment Variables
+
+See [.env.example](.env.example) for all required variables.
+
+Key variables:
+
+| Variable | Description |
+|---|---|
+| `TENANTS` | JSON array of tenant configs (slug, schema, domains) |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `DJANGO_SECRET_KEY` | Django secret key |
+| `JWT_SECRET` | JWT signing secret |
+| `DEBUG` | Enable Django debug mode (default: false) |
+
+## Deferred
+
+- **Background workers (Celery)**: Redis broker is ready. Add when async tasks are needed (e.g. custom domain verification, email).
+- **Additional i18n languages**: Add locale to `frontend/i18n/routing.ts`, create `messages/<locale>.json`. English URLs unaffected.
+- **Self-serve tenant provisioning**: Requires moving tenant config from env var to DB — significant architectural change.
