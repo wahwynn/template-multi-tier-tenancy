@@ -1,0 +1,22 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "auth": {
+    "login": "Log in",
+    "logout": "Log out",
+    "email": "Email",
+    "password": "Password"
+  },
+  "org": {
+    "units": "Organisation Units",
+    "members": "Members",
+    "apiKeys": "API Keys",
+    "addMember": "Add Member",
+    "createUnit": "Create Unit"
+  }
+}
