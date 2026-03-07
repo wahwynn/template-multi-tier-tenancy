@@ -43,14 +43,30 @@ docker compose exec backend uv run manage.py seed_tenant demo
 
 - Backend API: http://localhost:8000
 - Frontend: http://localhost:3000
-- Demo tenant (local path prefix): http://localhost:3000/t/demo/dashboard
+- Demo tenant login (path prefix): http://localhost:3000/t/demo/login
+- Demo tenant dashboard: http://localhost:3000/t/demo/dashboard
+
+### Demo credentials
+
+| Field | Value |
+|---|---|
+| Email | `admin@demo.local` |
+| Password | `demo-password-change-me` |
 
 ## Tenant Access
 
 Tenants are resolved from the request in this order:
 
-1. **Path prefix** (local dev): `/t/<slug>/v1/...` → e.g. `http://localhost:8000/t/acme/v1/org/units/`
-2. **Domain** (production): `acme.yourdomain.com` or `app.acme.com` (configured in `TENANTS`)
+1. **Path prefix** (local dev): `/t/<slug>/...` — e.g. `http://localhost:3000/t/acme/login`
+2. **Domain** (production): `acme.yourdomain.com` — resolved from `TENANTS[].domains`; visit `/login` and the tenant is detected automatically from the hostname
+
+To test domain-based routing locally, add an entry to `/etc/hosts`:
+
+```
+127.0.0.1  acme.localhost
+```
+
+Then visit `http://acme.localhost:3000/login`.
 
 ## Tenant Management
 
@@ -111,6 +127,8 @@ Key variables:
 | `DJANGO_SECRET_KEY` | Django secret key |
 | `JWT_SECRET` | JWT signing secret |
 | `DEBUG` | Enable Django debug mode (default: false) |
+| `NEXT_PUBLIC_API_URL` | Backend base URL seen by the browser |
+| `NEXT_PUBLIC_TENANTS` | Same JSON as `TENANTS` — used by `/login` to resolve tenant from hostname (set automatically in docker-compose) |
 
 ## Deferred
 
