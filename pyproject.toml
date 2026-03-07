@@ -26,3 +26,8 @@ known-first-party = ["app"]
 
 [tool.ty]
 python-version = "3.14"
+
+[tool.uv.workspace]
+members = [
+    "backend",
+]

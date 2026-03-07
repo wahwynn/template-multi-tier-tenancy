@@ -35,6 +35,9 @@ class APIKeyToken:
 class APIKeyAuthentication(BaseAuthentication):
     """Authenticate requests using an API key in the Bearer header."""
 
+    def authenticate_header(self, request: HttpRequest) -> str:
+        return 'Bearer realm="api"'
+
     def authenticate(self, request: HttpRequest) -> tuple | None:
         header: str = request.headers.get("Authorization", "")
         if not header.startswith("Bearer "):

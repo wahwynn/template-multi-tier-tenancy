@@ -23,6 +23,7 @@ TENANTS: list[dict] = json.loads(os.environ.get("TENANTS", "[]"))
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.sessions",
     "rest_framework",
     "rest_framework_simplejwt",
     "app.tenants",
