@@ -4,9 +4,14 @@ WORKDIR /app
 
 RUN pip install uv
 
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen
+# Copy workspace root (pyproject.toml + uv.lock) and backend package
+COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/
+RUN uv sync --frozen --package backend
 
-COPY . .
+# Copy backend source
+COPY backend/ backend/
+
+WORKDIR /app/backend
 
 EXPOSE 8000

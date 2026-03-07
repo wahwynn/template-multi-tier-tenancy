@@ -1,10 +1,12 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
@@ -19,6 +21,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    working_dir: /app/backend
     command: uv run manage.py runserver 0.0.0.0:8000
 
   frontend:
