@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
+    "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
     "app.tenants",
@@ -32,11 +33,25 @@ INSTALLED_APPS = [
 
 # SessionMiddleware and AuthenticationMiddleware intentionally omitted.
 # This is a stateless JWT/API-key API — no server-side sessions or CSRF.
+# CorsMiddleware must be before CommonMiddleware (and any middleware that
+# generates responses, e.g. TenantMiddleware) so preflight OPTIONS requests
+# are handled before the tenant resolution logic runs.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "app.tenants.middleware.TenantMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
+
+# --- CORS ---
+# In development allow the local Next.js dev server.
+# In production set CORS_ALLOWED_ORIGINS (or CORS_ALLOWED_ORIGIN_REGEXES)
+# to the actual frontend domain(s).
+_cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+CORS_ALLOWED_ORIGINS: list[str] = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+if not CORS_ALLOWED_ORIGINS:
+    # Fall back to permissive mode only when DEBUG is on
+    CORS_ALLOW_ALL_ORIGINS: bool = DEBUG
 
 ROOT_URLCONF = "config.urls"
 

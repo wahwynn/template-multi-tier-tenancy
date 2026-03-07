@@ -21,7 +21,8 @@ export default function LoginForm({ slug }: Props) {
     const res = await fetch(`${apiUrl}/t/${slug}/v1/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      // simplejwt expects `username` field; our users have email as their username
+      body: JSON.stringify({ username: email, password }),
     });
 
     if (res.ok) {
