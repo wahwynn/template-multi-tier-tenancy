@@ -40,14 +40,15 @@ class TenantMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         self._set_tenant(request)
-        if request.tenant is not None:
-            with connection.cursor() as cursor:
-                schema = safe_schema(request.tenant["schema"])
-                cursor.execute(f"SET search_path TO {schema}, public")
+        with connection.cursor() as cursor:
+            schema = safe_schema(request.tenant["schema"])
+            cursor.execute(f"SET search_path TO {schema}, public")
         return self.get_response(request)
 
     def _set_tenant(self, request: HttpRequest) -> None:
         tenant = self._resolve(request)
+        if tenant is None:
+            raise Http404("Tenant not found")
         request.tenant = tenant
 
     def _resolve(self, request: HttpRequest) -> dict | None:
@@ -57,8 +58,11 @@ class TenantMiddleware:
             parts = path.split("/", 3)
             if len(parts) >= 3 and parts[2]:
                 tenant = self._by_slug.get(parts[2])
-                if tenant is None:
-                    raise Http404("Tenant not found")
+                if tenant is not None:
+                    # Rewrite path to strip /t/<slug> prefix
+                    new_path = "/" + (parts[3] if len(parts) > 3 else "")
+                    request.path_info = new_path
+                    request.path = new_path
                 return tenant
 
         # 2. Host header (covers subdomains and custom domains)

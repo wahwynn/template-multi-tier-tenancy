@@ -23,14 +23,14 @@ class TestOrgUnitAPI(TestCase):
         self.client.force_authenticate(user=self.user)
 
     def test_list_org_units_returns_accessible_units(self):
-        response = self.client.get("/v1/org/units/")
+        response = self.client.get("/t/acme/v1/org/units/")
         assert response.status_code == 200
         slugs = [u["slug"] for u in response.data["results"]]
         assert "acme-corp" in slugs
 
     def test_create_org_unit(self):
         response = self.client.post(
-            "/v1/org/units/",
+            "/t/acme/v1/org/units/",
             {
                 "name": "Engineering",
                 "slug": "engineering",
@@ -44,35 +44,35 @@ class TestOrgUnitAPI(TestCase):
         assert response.data["slug"] == "engineering"
 
     def test_get_org_unit_detail(self):
-        response = self.client.get(f"/v1/org/units/{self.corp.pk}/")
+        response = self.client.get(f"/t/acme/v1/org/units/{self.corp.pk}/")
         assert response.status_code == 200
         assert response.data["name"] == "Acme Corp"
 
     def test_get_ancestors(self):
         dept = OrgUnit.objects.create(name="Dept", slug="dept", parent=self.corp)
-        response = self.client.get(f"/v1/org/units/{dept.pk}/ancestors/")
+        response = self.client.get(f"/t/acme/v1/org/units/{dept.pk}/ancestors/")
         assert response.status_code == 200
         assert any(u["slug"] == "acme-corp" for u in response.data)
 
     def test_get_descendants(self):
         dept = OrgUnit.objects.create(name="Dept", slug="dept", parent=self.corp)
-        response = self.client.get(f"/v1/org/units/{self.corp.pk}/descendants/")
+        response = self.client.get(f"/t/acme/v1/org/units/{self.corp.pk}/descendants/")
         assert response.status_code == 200
         assert any(u["slug"] == "dept" for u in response.data)
 
     def test_unauthenticated_request_returns_401(self):
         self.client.force_authenticate(user=None)
-        response = self.client.get("/v1/org/units/")
+        response = self.client.get("/t/acme/v1/org/units/")
         assert response.status_code == 401
 
     def test_list_members(self):
-        response = self.client.get(f"/v1/org/units/{self.corp.pk}/members/")
+        response = self.client.get(f"/t/acme/v1/org/units/{self.corp.pk}/members/")
         assert response.status_code == 200
 
     def test_add_member(self):
         new_user = User.objects.create_user(username="bob", password="pass")
         response = self.client.post(
-            f"/v1/org/units/{self.corp.pk}/members/",
+            f"/t/acme/v1/org/units/{self.corp.pk}/members/",
             {"user": new_user.pk, "org_unit": str(self.corp.pk), "role": "member"},
             format="json",
         )
