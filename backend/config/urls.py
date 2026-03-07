@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from app.org.authentication import EmailTokenObtainPairView
+from app.org.jwt_views import EmailTokenObtainPairView
 
 urlpatterns = [
     path("v1/auth/token/", EmailTokenObtainPairView.as_view(), name="token-obtain"),

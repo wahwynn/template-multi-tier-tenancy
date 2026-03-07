@@ -17,8 +17,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -96,11 +94,29 @@ class EmailAuthBackend:
             return None
 
 
-class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Accept ``email`` + ``password`` instead of ``username`` + ``password``."""
+class TenantJWTAuthentication:
+    """Wraps simplejwt's JWTAuthentication and enforces the tenant claim.
 
-    username_field = "email"
+    Loaded by DRF's DEFAULT_AUTHENTICATION_CLASSES — must not import
+    simplejwt views/serializers at module level to avoid a circular import.
+    """
 
+    def __init__(self) -> None:
+        from rest_framework_simplejwt.authentication import JWTAuthentication
 
-class EmailTokenObtainPairView(TokenObtainPairView):
-    serializer_class = EmailTokenObtainPairSerializer
+        self._jwt = JWTAuthentication()
+
+    def authenticate(self, request: object) -> tuple | None:
+        result = self._jwt.authenticate(request)
+        if result is None:
+            return None
+
+        user, token = result
+        token_tenant = token.get("tenant")
+        current_tenant = getattr(request, "tenant", None)
+        if token_tenant and current_tenant and token_tenant != current_tenant["slug"]:
+            raise AuthenticationFailed("Token is not valid for this tenant.")
+        return user, token
+
+    def authenticate_header(self, request: object) -> str:
+        return self._jwt.authenticate_header(request)

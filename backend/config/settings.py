@@ -83,13 +83,13 @@ CACHES = {
 }
 
 # --- Auth ---
-AUTH_USER_MODEL = "auth.User"
+AUTH_USER_MODEL = "app_org.User"
 AUTHENTICATION_BACKENDS = ["app.org.authentication.EmailAuthBackend"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "app.org.authentication.APIKeyAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "app.org.authentication.TenantJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

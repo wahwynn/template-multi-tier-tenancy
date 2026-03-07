@@ -15,8 +15,18 @@ from __future__ import annotations
 import uuid
 from typing import ClassVar
 
-from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
+
+
+class User(AbstractUser):
+    """Custom user model with UUID primary key."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    class Meta:
+        app_label = "app_org"
 
 
 class IsolationPolicy(models.TextChoices):
@@ -94,7 +104,7 @@ class Membership(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
-        get_user_model(),
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="memberships",
     )
@@ -123,7 +133,7 @@ class APIKey(models.Model):
     org_unit = models.ForeignKey(OrgUnit, on_delete=models.CASCADE, related_name="api_keys")
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
     created_by = models.ForeignKey(
-        get_user_model(),
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="created_api_keys",

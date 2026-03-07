@@ -36,10 +36,15 @@ class TenantMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         self._set_tenant(request)
+        schema = safe_schema(request.tenant["schema"])
         with connection.cursor() as cursor:
-            schema = safe_schema(request.tenant["schema"])
             cursor.execute(f"SET search_path TO {schema}, public")
-        return self.get_response(request)
+        # Expose current tenant on settings so token serializer can embed slug.
+        settings._current_tenant = request.tenant
+        try:
+            return self.get_response(request)
+        finally:
+            settings._current_tenant = None
 
     def _set_tenant(self, request: HttpRequest) -> None:
         tenant = self._resolve(request)
