@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import timedelta
 from pathlib import Path
+
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- Security ---
-SECRET_KEY: str = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
+SECRET_KEY: str = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-in-production")
 DEBUG: bool = os.environ.get("DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS: list[str] = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -26,7 +29,8 @@ INSTALLED_APPS = [
     "app.org",
 ]
 
-# --- Middleware ---
+# SessionMiddleware and AuthenticationMiddleware intentionally omitted.
+# This is a stateless JWT/API-key API — no server-side sessions or CSRF.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "app.tenants.middleware.TenantMiddleware",
@@ -51,8 +55,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # --- Database ---
-import dj_database_url  # noqa: E402
-
 DATABASES = {
     "default": dj_database_url.parse(
         os.environ.get("DATABASE_URL", "postgres://app:app@localhost:5432/app")
@@ -83,8 +85,6 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
     "EXCEPTION_HANDLER": "app.tenants.exceptions.custom_exception_handler",
 }
-
-from datetime import timedelta  # noqa: E402
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(seconds=int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRY", "3600"))),
