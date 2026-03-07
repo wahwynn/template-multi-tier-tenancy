@@ -1,0 +1,18 @@
+# Cursor Rules
+
+**You MUST read and follow all conventions in CONVENTIONS.md before making any changes.** That file contains all coding standards, style guides, and development workflows for this project.
+
+This file contains additional behavioral guidance specific to Cursor.
+
+## Pre-flight Check
+
+At the start of every session, before doing any work:
+
+1. Read `PROJECT.md`. If any metadata field says "(not yet decided)", **stop and ask the user** to fill it in before proceeding. Do not assume or guess the project type, framework, or database.
+
+## Cursor-Specific Behavior
+
+- **Read before editing**: Always read a file before modifying it. Use @file references to examine existing code before suggesting changes.
+- **No auto-imports of deprecated patterns**: When suggesting imports, follow the style guide in CONVENTIONS.md — e.g., never import `List`, `Dict`, `Optional` from `typing` in Python.
+- **Respect existing patterns**: Before creating new files or abstractions, search the codebase for existing patterns and follow them.
+- **Branch naming**: Use `cursor/<task-description>` for branches created via Cursor.
