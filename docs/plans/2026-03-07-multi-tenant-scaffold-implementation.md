@@ -269,8 +269,9 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
-    "app.tenants",
-    "app.org",
+    "core.tenants",
+    "core.users",
+    "core.org",
 ]
 
 # SessionMiddleware and AuthenticationMiddleware intentionally omitted.
@@ -280,7 +281,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "app.tenants.middleware.TenantMiddleware",
+    "core.tenants.middleware.TenantMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
 
@@ -318,19 +319,19 @@ CACHES = {
 }
 
 # --- Auth ---
-# Custom User model with UUID primary key lives in app_org.
-AUTH_USER_MODEL = "app_org.User"
-AUTHENTICATION_BACKENDS = ["app.org.authentication.EmailAuthBackend"]
+# Custom User model with UUID primary key lives in the users app.
+AUTH_USER_MODEL = "users.User"
+AUTHENTICATION_BACKENDS = ["core.users.authentication.EmailAuthBackend"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "app.org.authentication.APIKeyAuthentication",
-        "app.org.authentication.TenantJWTAuthentication",
+        "core.org.authentication.APIKeyAuthentication",   # uses APIKey model from org app
+        "core.users.authentication.TenantJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.CursorPagination",
     "PAGE_SIZE": 50,
-    "EXCEPTION_HANDLER": "app.tenants.exceptions.custom_exception_handler",
+    "EXCEPTION_HANDLER": "core.tenants.exceptions.custom_exception_handler",
 }
 
 SIMPLE_JWT = {
@@ -339,6 +340,9 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+# Every model must define an explicit UUID primary key field.
+# This fallback only fires for models without one — if it ever triggers
+# you will get an integer PK, which is a security regression.
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LANGUAGE_CODE = "en-us"
 USE_TZ = True
@@ -348,13 +352,13 @@ USE_TZ = True
 
 ```python
 from django.urls import include, path
-from app.org.jwt_views import EmailTokenObtainPairView
+from core.users.jwt_views import EmailTokenObtainPairView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("v1/auth/token/", EmailTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("v1/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    path("v1/org/", include("app.org.urls")),
+    path("v1/org/", include("core.org.urls")),
 ]
 ```
 
@@ -388,10 +392,12 @@ python_functions = test_*
 **Step 7: Create app package directories**
 
 ```bash
-mkdir -p app/tenants/management/commands app/org
-touch app/__init__.py app/tenants/__init__.py app/tenants/management/__init__.py app/tenants/management/commands/__init__.py app/org/__init__.py
-mkdir -p tests/tenants tests/org
-touch tests/__init__.py tests/tenants/__init__.py tests/org/__init__.py
+mkdir -p core/tenants/management/commands core/users/migrations core/org/migrations
+touch core/__init__.py core/tenants/__init__.py core/tenants/management/__init__.py core/tenants/management/commands/__init__.py
+touch core/users/__init__.py core/users/migrations/__init__.py
+touch core/org/__init__.py core/org/migrations/__init__.py
+mkdir -p tests/tenants tests/users tests/org
+touch tests/__init__.py tests/tenants/__init__.py tests/users/__init__.py tests/org/__init__.py
 ```
 
 **Step 8: Commit**
@@ -406,12 +412,12 @@ git commit -m "chore: initialise Django project with uv and core settings"
 ## Task 4: Tenant utilities
 
 **Files:**
-- Create: `backend/app/tenants/utils.py`
+- Create: `backend/core/tenants/utils.py`
 - Test inline in task 5 middleware tests (safe_schema is simple enough to test via middleware)
 
 **Context:** `safe_schema` validates that a schema name is safe to interpolate into a SQL identifier position. It must be called before any `SET search_path` or `CREATE SCHEMA` SQL. All management commands and middleware must use it.
 
-**Step 1: Create backend/app/tenants/utils.py**
+**Step 1: Create backend/core/tenants/utils.py**
 
 ```python
 """Shared utilities for tenant management."""
@@ -437,7 +443,7 @@ def safe_schema(schema: str) -> str:
 **Step 2: Commit**
 
 ```bash
-git add app/tenants/utils.py
+git add core/tenants/utils.py
 git commit -m "feat: add safe_schema validator utility"
 ```
 
@@ -446,7 +452,7 @@ git commit -m "feat: add safe_schema validator utility"
 ## Task 5: Tenant middleware
 
 **Files:**
-- Create: `backend/app/tenants/middleware.py`
+- Create: `backend/core/tenants/middleware.py`
 - Create: `backend/tests/tenants/test_middleware.py`
 
 **Context:** Middleware responsibilities:
@@ -469,7 +475,7 @@ import pytest
 from django.http import Http404
 from django.test import RequestFactory, override_settings
 
-from app.tenants.middleware import TenantMiddleware, _safe_schema
+from core.tenants.middleware import TenantMiddleware, _safe_schema
 
 TENANTS_CONFIG = [
     {"slug": "acme", "schema": "acme", "domains": ["acme.localhost"], "demo": False},
@@ -539,7 +545,7 @@ def test_tenant_middleware_rewrites_path_prefix():
 
 
 @override_settings(TENANTS=TENANTS_CONFIG)
-@patch("app.tenants.middleware.connection")
+@patch("core.tenants.middleware.connection")
 def test_tenant_middleware_search_path_includes_shared(mock_connection):
     mock_cursor = MagicMock()
     mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
@@ -573,11 +579,11 @@ def test_safe_schema_rejects_invalid_name():
 cd backend && uv run pytest tests/tenants/test_middleware.py -v
 ```
 
-Expected: `FAILED` — `app.tenants.middleware` does not exist yet.
+Expected: `FAILED` — `core.tenants.middleware` does not exist yet.
 
 **Step 3: Implement TenantMiddleware**
 
-Create `backend/app/tenants/middleware.py`:
+Create `backend/core/tenants/middleware.py`:
 
 ```python
 """Tenant resolution middleware.
@@ -597,7 +603,7 @@ from django.conf import settings
 from django.db import connection
 from django.http import Http404, HttpRequest, HttpResponse
 
-from app.tenants.utils import safe_schema
+from core.tenants.utils import safe_schema
 
 _safe_schema = safe_schema  # backwards-compatible alias for tests
 
@@ -664,7 +670,7 @@ Expected: all PASSED.
 **Step 5: Commit**
 
 ```bash
-git add app/tenants/middleware.py tests/tenants/test_middleware.py
+git add core/tenants/middleware.py tests/tenants/test_middleware.py
 git commit -m "feat: add TenantMiddleware with path-prefix resolution, path rewriting, and shared schema"
 ```
 
@@ -673,7 +679,7 @@ git commit -m "feat: add TenantMiddleware with path-prefix resolution, path rewr
 ## Task 6: Custom exception handler
 
 **Files:**
-- Create: `backend/app/tenants/exceptions.py`
+- Create: `backend/core/tenants/exceptions.py`
 - Create: `backend/tests/tenants/test_exceptions.py`
 
 **Step 1: Write the failing test**
@@ -686,7 +692,7 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.test import APIRequestFactory
 
-from app.tenants.exceptions import custom_exception_handler
+from core.tenants.exceptions import custom_exception_handler
 
 
 def test_custom_exception_handler_formats_drf_exception():
@@ -711,7 +717,7 @@ uv run pytest tests/tenants/test_exceptions.py -v
 
 **Step 3: Implement exception handler**
 
-Create `backend/app/tenants/exceptions.py`:
+Create `backend/core/tenants/exceptions.py`:
 
 ```python
 """Consistent error response shape for all API endpoints.
@@ -766,7 +772,7 @@ uv run pytest tests/tenants/test_exceptions.py -v
 **Step 5: Commit**
 
 ```bash
-git add app/tenants/exceptions.py tests/tenants/test_exceptions.py
+git add core/tenants/exceptions.py tests/tenants/test_exceptions.py
 git commit -m "feat: add consistent API error response format"
 ```
 
@@ -775,9 +781,9 @@ git commit -m "feat: add consistent API error response format"
 ## Task 7: Management commands — migrate_shared, create_tenant, migrate_tenants
 
 **Files:**
-- Create: `backend/app/tenants/management/commands/migrate_shared.py`
-- Create: `backend/app/tenants/management/commands/create_tenant.py`
-- Create: `backend/app/tenants/management/commands/migrate_tenants.py`
+- Create: `backend/core/tenants/management/commands/migrate_shared.py`
+- Create: `backend/core/tenants/management/commands/create_tenant.py`
+- Create: `backend/core/tenants/management/commands/migrate_tenants.py`
 - Create: `backend/tests/tenants/test_management_commands.py`
 
 **Context:** Three-tier database setup order:
@@ -800,9 +806,9 @@ import pytest
 from django.core.management.base import CommandError
 from django.test import override_settings
 
-from app.tenants.management.commands.create_tenant import Command as CreateTenantCommand
-from app.tenants.management.commands.migrate_shared import Command as MigrateSharedCommand
-from app.tenants.management.commands.migrate_tenants import Command as MigrateTenantsCommand
+from core.tenants.management.commands.create_tenant import Command as CreateTenantCommand
+from core.tenants.management.commands.migrate_shared import Command as MigrateSharedCommand
+from core.tenants.management.commands.migrate_tenants import Command as MigrateTenantsCommand
 
 TENANTS_CONFIG = [
     {"slug": "acme", "schema": "acme", "domains": ["acme.localhost"]},
@@ -810,8 +816,8 @@ TENANTS_CONFIG = [
 ]
 
 
-@patch("app.tenants.management.commands.migrate_shared.call_command")
-@patch("app.tenants.management.commands.migrate_shared.connection")
+@patch("core.tenants.management.commands.migrate_shared.call_command")
+@patch("core.tenants.management.commands.migrate_shared.connection")
 def test_migrate_shared_creates_schema_and_runs_migrate(mock_connection, mock_call_command):
     mock_cursor = MagicMock()
     mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
@@ -826,8 +832,8 @@ def test_migrate_shared_creates_schema_and_runs_migrate(mock_connection, mock_ca
 
 
 @override_settings(TENANTS=TENANTS_CONFIG)
-@patch("app.tenants.management.commands.create_tenant.call_command")
-@patch("app.tenants.management.commands.create_tenant.connection")
+@patch("core.tenants.management.commands.create_tenant.call_command")
+@patch("core.tenants.management.commands.create_tenant.connection")
 def test_create_tenant_creates_schema_and_runs_migrations(mock_connection, mock_call_command):
     mock_cursor = MagicMock()
     mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
@@ -848,8 +854,8 @@ def test_create_tenant_raises_error_for_unknown_slug():
 
 
 @override_settings(TENANTS=TENANTS_CONFIG)
-@patch("app.tenants.management.commands.migrate_tenants.call_command")
-@patch("app.tenants.management.commands.migrate_tenants.connection")
+@patch("core.tenants.management.commands.migrate_tenants.call_command")
+@patch("core.tenants.management.commands.migrate_tenants.connection")
 def test_migrate_tenants_runs_migrate_for_all_tenants(mock_connection, mock_call_command):
     mock_connection.settings_dict = {"OPTIONS": {}}
 
@@ -869,7 +875,7 @@ Expected: `FAILED` — modules do not exist yet.
 
 **Step 3: Implement migrate_shared**
 
-Create `backend/app/tenants/management/commands/migrate_shared.py`:
+Create `backend/core/tenants/management/commands/migrate_shared.py`:
 
 ```python
 """Management command: migrate_shared.
@@ -914,7 +920,7 @@ class Command(BaseCommand):
 
 **Step 4: Implement create_tenant**
 
-Create `backend/app/tenants/management/commands/create_tenant.py`:
+Create `backend/core/tenants/management/commands/create_tenant.py`:
 
 ```python
 """Management command: create_tenant.
@@ -933,7 +939,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
-from app.tenants.utils import safe_schema
+from core.tenants.utils import safe_schema
 
 
 class Command(BaseCommand):
@@ -960,7 +966,7 @@ class Command(BaseCommand):
 
 **Step 5: Implement migrate_tenants**
 
-Create `backend/app/tenants/management/commands/migrate_tenants.py`:
+Create `backend/core/tenants/management/commands/migrate_tenants.py`:
 
 ```python
 """Management command: migrate_tenants.
@@ -980,7 +986,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from app.tenants.utils import safe_schema
+from core.tenants.utils import safe_schema
 
 
 class Command(BaseCommand):
@@ -1032,21 +1038,30 @@ Expected: all PASSED.
 **Step 7: Commit**
 
 ```bash
-git add app/tenants/management/ tests/tenants/test_management_commands.py
+git add core/tenants/management/ tests/tenants/test_management_commands.py
 git commit -m "feat: add migrate_shared, create_tenant, and migrate_tenants management commands"
 ```
 
 ---
 
-## Task 8: Models — User, OrgUnit, Membership, APIKey
+## Task 8: Models — User (users app) and OrgUnit, Membership, APIKey (org app)
 
 **Files:**
-- Create: `backend/app/org/models.py`
-- Create: `backend/app/org/apps.py`
-- Create: `backend/app/org/migrations/0001_initial.py`
+- Create: `backend/core/users/apps.py`
+- Create: `backend/core/users/models.py`
+- Create: `backend/core/users/migrations/0001_initial.py`
+- Create: `backend/core/org/apps.py`
+- Create: `backend/core/org/models.py`
+- Create: `backend/core/org/migrations/0001_initial.py`
 - Create: `backend/tests/org/test_org_unit.py`
 
-**Context:** All models live in the `app_org` app (label set in Meta). The custom `User` model with a UUID primary key is defined here (not in `django.contrib.auth`) so that `AUTH_USER_MODEL = "app_org.User"` resolves correctly. The initial migration includes the User model inline — no `swappable_dependency` — which avoids a circular migration dependency. FKs to User use `"app_org.user"` (hardcoded) not `settings.AUTH_USER_MODEL`.
+**Context:** Models are split across two apps:
+- `core.users` (`app_label = "users"`) — owns `User`. `AUTH_USER_MODEL = "users.User"`. Authentication backends and JWT views also live here.
+- `core.org` (`app_label = "org"`) — owns `OrgUnit`, `Membership`, `APIKey`.
+
+All models use explicit `db_table` names (no app-label prefix in table names), and UUID primary keys.
+
+Migration order: `users` 0001 runs first (depends on `auth`), then `org` 0001 (depends on `users`). No `swappable_dependency` is used — `User` is defined in `users`, so `org` FKs reference `"users.user"` directly.
 
 **Step 1: Write the failing tests**
 
@@ -1058,7 +1073,7 @@ Create `backend/tests/org/test_org_unit.py`:
 import pytest
 from django.test import TestCase
 
-from app.org.models import IsolationPolicy, OrgUnit
+from core.org.models import IsolationPolicy, OrgUnit
 
 
 class TestOrgUnitCreation(TestCase):
@@ -1101,26 +1116,122 @@ class TestOrgUnitAncestors(TestCase):
 uv run pytest tests/org/test_org_unit.py -v
 ```
 
-**Step 3: Create app/org/apps.py**
+**Step 3: Create users app config**
+
+Create `backend/core/users/apps.py`:
+
+```python
+from django.apps import AppConfig
+
+
+class UsersConfig(AppConfig):
+    name = "core.users"
+    label = "users"
+```
+
+**Step 4: Implement users/models.py**
+
+Create `backend/core/users/models.py`:
+
+```python
+"""User model for the users app."""
+
+from __future__ import annotations
+
+import uuid
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class User(AbstractUser):
+    """Custom user model with UUID primary key."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    class Meta:
+        app_label = "users"
+        db_table = "users"
+```
+
+**Step 5: Create users/migrations/0001_initial.py**
+
+```python
+import uuid
+
+import django.contrib.auth.models
+import django.contrib.auth.validators
+import django.utils.timezone
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = [
+        ("auth", "0012_alter_user_first_name_max_length"),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="User",
+            fields=[
+                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                ("last_login", models.DateTimeField(blank=True, null=True, verbose_name="last login")),
+                ("is_superuser", models.BooleanField(default=False, verbose_name="superuser status")),
+                (
+                    "username",
+                    models.CharField(
+                        error_messages={"unique": "A user with that username already exists."},
+                        max_length=150, unique=True,
+                        validators=[django.contrib.auth.validators.UnicodeUsernameValidator()],
+                        verbose_name="username",
+                    ),
+                ),
+                ("first_name", models.CharField(blank=True, max_length=150, verbose_name="first name")),
+                ("last_name", models.CharField(blank=True, max_length=150, verbose_name="last name")),
+                ("email", models.EmailField(blank=True, max_length=254, verbose_name="email address")),
+                ("is_staff", models.BooleanField(default=False, verbose_name="staff status")),
+                ("is_active", models.BooleanField(default=True, verbose_name="active")),
+                ("date_joined", models.DateTimeField(default=django.utils.timezone.now, verbose_name="date joined")),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True, related_name="user_set", related_query_name="user",
+                        to="auth.group", verbose_name="groups",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True, related_name="user_set", related_query_name="user",
+                        to="auth.permission", verbose_name="user permissions",
+                    ),
+                ),
+            ],
+            options={"app_label": "users", "db_table": "users"},
+            managers=[("objects", django.contrib.auth.models.UserManager())],
+        ),
+    ]
+```
+
+**Step 6: Create org app config**
+
+Create `backend/core/org/apps.py`:
 
 ```python
 from django.apps import AppConfig
 
 
 class OrgConfig(AppConfig):
-    name = "app.org"
-    label = "app_org"
+    name = "core.org"
+    label = "org"
 ```
 
-Add to `app/org/__init__.py`:
+**Step 7: Implement org/models.py**
 
-```python
-default_app_config = "app.org.apps.OrgConfig"
-```
-
-**Step 4: Implement models**
-
-Create `backend/app/org/models.py`:
+Create `backend/core/org/models.py`:
 
 ```python
 """Org hierarchy models.
@@ -1141,17 +1252,7 @@ import uuid
 from typing import ClassVar
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-
-
-class User(AbstractUser):
-    """Custom user model with UUID primary key."""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    class Meta:
-        app_label = "app_org"
 
 
 class IsolationPolicy(models.TextChoices):
@@ -1189,7 +1290,8 @@ class OrgUnit(models.Model):
     )
 
     class Meta:
-        app_label = "app_org"
+        app_label = "org"
+        db_table = "org_units"
 
     def __str__(self) -> str:
         return self.name
@@ -1211,9 +1313,9 @@ class OrgUnit(models.Model):
             cursor.execute(
                 """
                 WITH RECURSIVE descendants AS (
-                    SELECT id FROM app_org_orgunit WHERE parent_id = %s
+                    SELECT id FROM org_units WHERE parent_id = %s
                     UNION ALL
-                    SELECT o.id FROM app_org_orgunit o
+                    SELECT o.id FROM org_units o
                     INNER JOIN descendants d ON o.parent_id = d.id
                 )
                 SELECT id FROM descendants
@@ -1241,7 +1343,8 @@ class Membership(models.Model):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
 
     class Meta:
-        app_label = "app_org"
+        app_label = "org"
+        db_table = "memberships"
         constraints: ClassVar = [models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")]
 
     def __str__(self) -> str:
@@ -1267,79 +1370,32 @@ class APIKey(models.Model):
     last_used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        app_label = "app_org"
+        app_label = "org"
+        db_table = "api_keys"
         constraints: ClassVar = [models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.prefix}...)"
 ```
 
-**Step 5: Create the initial migration**
-
-Create `backend/app/org/migrations/__init__.py` (empty), then create `backend/app/org/migrations/0001_initial.py`:
+**Step 8: Create org/migrations/0001_initial.py**
 
 ```python
 import uuid
 
-import django.contrib.auth.models
-import django.contrib.auth.validators
 import django.db.models.deletion
-import django.utils.timezone
+from django.conf import settings
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
     initial = True
 
-    # Depend on auth (for auth.Group and auth.Permission M2M), NOT on
-    # swappable_dependency — that would create a circular dependency since
-    # User is defined in this same app.
     dependencies = [
-        ("auth", "0012_alter_user_first_name_max_length"),
+        ("users", "0001_initial"),
     ]
 
     operations = [
-        migrations.CreateModel(
-            name="User",
-            fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ("password", models.CharField(max_length=128, verbose_name="password")),
-                ("last_login", models.DateTimeField(blank=True, null=True, verbose_name="last login")),
-                ("is_superuser", models.BooleanField(default=False, verbose_name="superuser status")),
-                (
-                    "username",
-                    models.CharField(
-                        error_messages={"unique": "A user with that username already exists."},
-                        max_length=150,
-                        unique=True,
-                        validators=[django.contrib.auth.validators.UnicodeUsernameValidator()],
-                        verbose_name="username",
-                    ),
-                ),
-                ("first_name", models.CharField(blank=True, max_length=150, verbose_name="first name")),
-                ("last_name", models.CharField(blank=True, max_length=150, verbose_name="last name")),
-                ("email", models.EmailField(blank=True, max_length=254, verbose_name="email address")),
-                ("is_staff", models.BooleanField(default=False, verbose_name="staff status")),
-                ("is_active", models.BooleanField(default=True, verbose_name="active")),
-                ("date_joined", models.DateTimeField(default=django.utils.timezone.now, verbose_name="date joined")),
-                (
-                    "groups",
-                    models.ManyToManyField(
-                        blank=True, related_name="user_set", related_query_name="user",
-                        to="auth.group", verbose_name="groups",
-                    ),
-                ),
-                (
-                    "user_permissions",
-                    models.ManyToManyField(
-                        blank=True, related_name="user_set", related_query_name="user",
-                        to="auth.permission", verbose_name="user permissions",
-                    ),
-                ),
-            ],
-            options={"app_label": "app_org"},
-            managers=[("objects", django.contrib.auth.models.UserManager())],
-        ),
         migrations.CreateModel(
             name="OrgUnit",
             fields=[
@@ -1358,11 +1414,11 @@ class Migration(migrations.Migration):
                     "parent",
                     models.ForeignKey(
                         blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
-                        related_name="children", to="app_org.orgunit",
+                        related_name="children", to="org.orgunit",
                     ),
                 ),
             ],
-            options={"app_label": "app_org"},
+            options={"app_label": "org", "db_table": "org_units"},
         ),
         migrations.CreateModel(
             name="Membership",
@@ -1375,11 +1431,12 @@ class Migration(migrations.Migration):
                         default="member", max_length=20,
                     ),
                 ),
-                ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to="app_org.user")),
-                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to="app_org.orgunit")),
+                ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to=settings.AUTH_USER_MODEL)),
+                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to="org.orgunit")),
             ],
             options={
-                "app_label": "app_org",
+                "app_label": "org",
+                "db_table": "memberships",
                 "constraints": [models.UniqueConstraint(fields=("user", "org_unit"), name="unique_user_org_unit")],
             },
         ),
@@ -1399,18 +1456,19 @@ class Migration(migrations.Migration):
                 ),
                 ("expires_at", models.DateTimeField(blank=True, null=True)),
                 ("last_used_at", models.DateTimeField(blank=True, null=True)),
-                ("created_by", models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="created_api_keys", to="app_org.user")),
-                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="api_keys", to="app_org.orgunit")),
+                ("created_by", models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="created_api_keys", to=settings.AUTH_USER_MODEL)),
+                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="api_keys", to="org.orgunit")),
             ],
             options={
-                "app_label": "app_org",
+                "app_label": "org",
+                "db_table": "api_keys",
                 "constraints": [models.UniqueConstraint(fields=("prefix", "hashed_key"), name="unique_api_key")],
             },
         ),
     ]
 ```
 
-**Step 6: Run tests to verify they pass**
+**Step 9: Run tests to verify they pass**
 
 ```bash
 uv run pytest tests/org/test_org_unit.py -v
@@ -1418,11 +1476,11 @@ uv run pytest tests/org/test_org_unit.py -v
 
 Expected: all PASSED.
 
-**Step 7: Commit**
+**Step 10: Commit**
 
 ```bash
-git add app/org/ tests/org/test_org_unit.py
-git commit -m "feat: add User (UUID PK), OrgUnit, Membership, and APIKey models"
+git add core/users/ core/org/ tests/org/test_org_unit.py
+git commit -m "feat: add User (users app) and OrgUnit, Membership, APIKey (org app) with UUID PKs and explicit table names"
 ```
 
 ---
@@ -1430,16 +1488,17 @@ git commit -m "feat: add User (UUID PK), OrgUnit, Membership, and APIKey models"
 ## Task 9: Authentication — email auth, API keys, tenant JWT
 
 **Files:**
-- Create: `backend/app/org/authentication.py`
-- Create: `backend/app/org/jwt_views.py`
-- Create: `backend/tests/org/test_authentication.py`
+- Create: `backend/core/users/authentication.py`
+- Create: `backend/core/users/jwt_views.py`
+- Create: `backend/core/org/authentication.py`
+- Create: `backend/tests/users/test_authentication.py`
 
-**Context:** Three authentication paths:
-1. **API key** — `Authorization: Bearer <hex-key>` (no dots). Hashed and looked up against `APIKey` table.
-2. **Email JWT** — `Authorization: Bearer <jwt>` (contains dots). Validated by `TenantJWTAuthentication`, which wraps simplejwt and also validates the `tenant` claim in the token against the current request tenant.
-3. **Login** — `POST /v1/auth/token/` with `{ "email": "...", "password": "..." }`. `EmailAuthBackend` authenticates by email instead of username. `EmailTokenObtainPairSerializer` embeds the tenant slug as a `tenant` claim in the JWT.
+**Context:** Authentication is split across two files following the app split:
+- `core.users.authentication` — `EmailAuthBackend` (Django backend, email login) and `TenantJWTAuthentication` (DRF backend, validates JWT tenant claim)
+- `core.org.authentication` — `APIKeyAuthentication` (DRF backend, uses `APIKey` from org app)
+- `core.users.jwt_views` — `EmailTokenObtainPairView` (the login endpoint, embeds tenant slug in token)
 
-`jwt_views.py` is a separate file (not imported by `authentication.py`) to avoid a circular import: `authentication.py` is loaded by DRF at startup via `DEFAULT_AUTHENTICATION_CLASSES`; importing simplejwt views at that point triggers a circular import chain through DRF settings.
+`jwt_views.py` is separate from `authentication.py` to avoid a circular import: `authentication.py` is loaded by DRF at startup via `DEFAULT_AUTHENTICATION_CLASSES`; importing simplejwt views at that point triggers a circular import chain through DRF settings.
 
 **Step 1: Write the failing tests**
 
@@ -1456,8 +1515,10 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 
-from app.org.authentication import APIKeyAuthentication, EmailAuthBackend
-from app.org.models import APIKey, OrgUnit, Role, User
+from core.users.authentication import EmailAuthBackend, TenantJWTAuthentication
+from core.org.authentication import APIKeyAuthentication
+from core.org.models import APIKey, OrgUnit, Role
+from core.users.models import User
 
 
 def _make_key() -> tuple[str, str, str]:
@@ -1534,19 +1595,83 @@ uv run pytest tests/org/test_authentication.py -v
 
 **Step 3: Implement authentication.py**
 
-Create `backend/app/org/authentication.py`:
+Create `backend/core/users/authentication.py`:
 
 ```python
-"""Authentication backends for Django and DRF.
+"""Authentication backends for the users app.
 
-Three classes:
-- APIKeyAuthentication: DRF backend for Bearer <hex-key> tokens
-- EmailAuthBackend: Django auth backend accepting email instead of username
-- TenantJWTAuthentication: wraps simplejwt and validates the tenant claim
+- EmailAuthBackend: Django auth backend accepting email instead of username.
+- TenantJWTAuthentication: DRF backend that wraps simplejwt and validates
+  the tenant claim embedded in the token.
 
-Imports are structured carefully to avoid circular imports at module load time:
-simplejwt views/serializers must NOT be imported at module level here, because
-this file is loaded by DRF's DEFAULT_AUTHENTICATION_CLASSES during settings init.
+Must NOT import simplejwt views/serializers at module level — this file is
+loaded by DRF's DEFAULT_AUTHENTICATION_CLASSES during settings init, and doing
+so would cause a circular import chain through DRF settings.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from django.contrib.auth import get_user_model
+from rest_framework.exceptions import AuthenticationFailed
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
+
+
+class EmailAuthBackend:
+    """Django auth backend that accepts email instead of username."""
+
+    def authenticate(self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: object) -> object | None:
+        User = get_user_model()
+        email = kwargs.get("email") or username
+        if not email or not password:
+            return None
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return None
+        return user if user.check_password(password) and user.is_active else None
+
+    def get_user(self, user_id: object) -> object | None:
+        User = get_user_model()
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
+
+
+class TenantJWTAuthentication:
+    """Wraps simplejwt's JWTAuthentication and enforces the tenant claim."""
+
+    def __init__(self) -> None:
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+
+        self._jwt = JWTAuthentication()
+
+    def authenticate(self, request: object) -> tuple | None:
+        result = self._jwt.authenticate(request)
+        if result is None:
+            return None
+
+        user, token = result
+        token_tenant = token.get("tenant")
+        current_tenant = getattr(request, "tenant", None)
+        if token_tenant and current_tenant and token_tenant != current_tenant["slug"]:
+            raise AuthenticationFailed("Token is not valid for this tenant.")
+        return user, token
+
+    def authenticate_header(self, request: object) -> str:
+        return self._jwt.authenticate_header(request)
+```
+
+Create `backend/core/org/authentication.py`:
+
+```python
+"""API key authentication backend for the org app.
+
+Kept in core.org (not core.users) because it imports APIKey from this app.
 """
 
 from __future__ import annotations
@@ -1554,7 +1679,6 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
@@ -1562,7 +1686,7 @@ from rest_framework.exceptions import AuthenticationFailed
 if TYPE_CHECKING:
     from django.http import HttpRequest
 
-    from app.org.models import APIKey
+    from core.org.models import APIKey
 
 
 class APIKeyToken:
@@ -1597,7 +1721,7 @@ class APIKeyAuthentication(BaseAuthentication):
         prefix = raw_key[:8]
         hashed = hashlib.sha256(raw_key.encode()).hexdigest()
 
-        from app.org.models import APIKey  # local import avoids circular
+        from core.org.models import APIKey  # local import avoids circular
 
         try:
             key = APIKey.objects.select_related("org_unit", "created_by").get(prefix=prefix, hashed_key=hashed)
@@ -1610,61 +1734,11 @@ class APIKeyAuthentication(BaseAuthentication):
         APIKey.objects.filter(pk=key.pk).update(last_used_at=timezone.now())
 
         return key.created_by, APIKeyToken(key)
-
-
-class EmailAuthBackend:
-    """Django auth backend that accepts email instead of username."""
-
-    def authenticate(self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: object) -> object | None:
-        User = get_user_model()
-        email = kwargs.get("email") or username
-        if not email or not password:
-            return None
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return None
-        return user if user.check_password(password) and user.is_active else None
-
-    def get_user(self, user_id: int) -> object | None:
-        User = get_user_model()
-        try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
-            return None
-
-
-class TenantJWTAuthentication:
-    """Wraps simplejwt's JWTAuthentication and enforces the tenant claim.
-
-    Loaded by DRF's DEFAULT_AUTHENTICATION_CLASSES — must not import
-    simplejwt views/serializers at module level to avoid a circular import.
-    """
-
-    def __init__(self) -> None:
-        from rest_framework_simplejwt.authentication import JWTAuthentication
-
-        self._jwt = JWTAuthentication()
-
-    def authenticate(self, request: object) -> tuple | None:
-        result = self._jwt.authenticate(request)
-        if result is None:
-            return None
-
-        user, token = result
-        token_tenant = token.get("tenant")
-        current_tenant = getattr(request, "tenant", None)
-        if token_tenant and current_tenant and token_tenant != current_tenant["slug"]:
-            raise AuthenticationFailed("Token is not valid for this tenant.")
-        return user, token
-
-    def authenticate_header(self, request: object) -> str:
-        return self._jwt.authenticate_header(request)
 ```
 
 **Step 4: Implement jwt_views.py**
 
-Create `backend/app/org/jwt_views.py`:
+Create `backend/core/users/jwt_views.py`:
 
 ```python
 """JWT token views with email login and tenant claim embedding.
@@ -1710,7 +1784,7 @@ Expected: all PASSED.
 **Step 6: Commit**
 
 ```bash
-git add app/org/authentication.py app/org/jwt_views.py tests/org/test_authentication.py
+git add core/users/authentication.py core/users/jwt_views.py core/org/authentication.py tests/users/test_authentication.py
 git commit -m "feat: add email auth, API key auth, and tenant-scoped JWT"
 ```
 
@@ -1719,9 +1793,9 @@ git commit -m "feat: add email auth, API key auth, and tenant-scoped JWT"
 ## Task 10: OrgUnit API endpoints
 
 **Files:**
-- Create: `backend/app/org/serializers.py`
-- Create: `backend/app/org/views.py`
-- Create: `backend/app/org/urls.py`
+- Create: `backend/core/org/serializers.py`
+- Create: `backend/core/org/views.py`
+- Create: `backend/core/org/urls.py`
 - Create: `backend/tests/org/test_org_api.py`
 
 **Step 1: Write the failing tests**
@@ -1736,7 +1810,8 @@ from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from app.org.models import Membership, OrgUnit, Role, User
+from core.org.models import Membership, OrgUnit, Role
+from core.users.models import User
 
 TENANTS_CONFIG = [{"slug": "demo", "schema": "demo", "domains": []}]
 
@@ -1776,14 +1851,15 @@ uv run pytest tests/org/test_org_api.py -v
 
 **Step 3: Implement serializers**
 
-Create `backend/app/org/serializers.py`:
+Create `backend/core/org/serializers.py`:
 
 ```python
 from __future__ import annotations
 
 from rest_framework import serializers
 
-from app.org.models import APIKey, Membership, OrgUnit, Role, User
+from core.org.models import APIKey, Membership, OrgUnit, Role
+from core.users.models import User
 
 
 class OrgUnitSerializer(serializers.ModelSerializer):
@@ -1827,7 +1903,7 @@ class APIKeyListSerializer(serializers.ModelSerializer):
 
 **Step 4: Implement views**
 
-Create `backend/app/org/views.py`:
+Create `backend/core/org/views.py`:
 
 ```python
 from __future__ import annotations
@@ -1840,8 +1916,8 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from app.org.models import APIKey, Membership, OrgUnit
-from app.org.serializers import (
+from core.org.models import APIKey, Membership, OrgUnit
+from core.org.serializers import (
     APIKeyCreateSerializer,
     APIKeyListSerializer,
     MembershipSerializer,
@@ -1895,12 +1971,12 @@ class APIKeyDeleteView(APIView):
 
 **Step 5: Implement urls**
 
-Create `backend/app/org/urls.py`:
+Create `backend/core/org/urls.py`:
 
 ```python
 from django.urls import path
 
-from app.org.views import (
+from core.org.views import (
     APIKeyDeleteView,
     APIKeyListCreateView,
     MemberListCreateView,
@@ -1926,7 +2002,7 @@ uv run pytest tests/org/test_org_api.py -v
 **Step 7: Commit**
 
 ```bash
-git add app/org/serializers.py app/org/views.py app/org/urls.py tests/org/test_org_api.py
+git add core/org/serializers.py core/org/views.py core/org/urls.py tests/org/test_org_api.py
 git commit -m "feat: add OrgUnit, Membership, and APIKey REST API endpoints"
 ```
 
@@ -1935,7 +2011,7 @@ git commit -m "feat: add OrgUnit, Membership, and APIKey REST API endpoints"
 ## Task 11: seed_tenant management command
 
 **Files:**
-- Create: `backend/app/tenants/management/commands/seed_tenant.py`
+- Create: `backend/core/tenants/management/commands/seed_tenant.py`
 - Create: `backend/tests/tenants/test_seed_tenant.py`
 
 **Step 1: Write the failing tests**
@@ -1953,10 +2029,10 @@ TENANTS_CONFIG = [{"slug": "demo", "schema": "demo", "domains": []}]
 
 
 @override_settings(TENANTS=TENANTS_CONFIG)
-@patch("app.tenants.management.commands.seed_tenant.Membership")
-@patch("app.tenants.management.commands.seed_tenant.User")
-@patch("app.tenants.management.commands.seed_tenant.OrgUnit")
-@patch("app.tenants.management.commands.seed_tenant.connection")
+@patch("core.tenants.management.commands.seed_tenant.Membership")
+@patch("core.tenants.management.commands.seed_tenant.User")
+@patch("core.tenants.management.commands.seed_tenant.OrgUnit")
+@patch("core.tenants.management.commands.seed_tenant.connection")
 def test_seed_tenant_sets_search_path_with_shared(mock_connection, mock_org_unit, mock_user, mock_membership):
     mock_cursor = MagicMock()
     mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
@@ -1965,7 +2041,7 @@ def test_seed_tenant_sets_search_path_with_shared(mock_connection, mock_org_unit
     mock_user.objects.get_or_create.return_value = (MagicMock(), False)
     mock_membership.objects.get_or_create.return_value = (MagicMock(), True)
 
-    from app.tenants.management.commands.seed_tenant import Command
+    from core.tenants.management.commands.seed_tenant import Command
     cmd = Command()
     cmd.handle(slug="demo", verbosity=0)
 
@@ -1982,7 +2058,7 @@ uv run pytest tests/tenants/test_seed_tenant.py -v
 
 **Step 3: Implement seed_tenant**
 
-Create `backend/app/tenants/management/commands/seed_tenant.py`:
+Create `backend/core/tenants/management/commands/seed_tenant.py`:
 
 ```python
 """Management command: seed_tenant.
@@ -1997,14 +2073,12 @@ Idempotent: safe to run multiple times.
 from __future__ import annotations
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
-from app.org.models import Membership, OrgUnit, Role
-from app.tenants.utils import safe_schema
-
-User = get_user_model()
+from core.org.models import Membership, OrgUnit, Role
+from core.tenants.utils import safe_schema
+from core.users.models import User
 
 
 class Command(BaseCommand):
@@ -2059,7 +2133,7 @@ uv run pytest tests/tenants/test_seed_tenant.py -v
 **Step 5: Commit**
 
 ```bash
-git add app/tenants/management/commands/seed_tenant.py tests/tenants/test_seed_tenant.py
+git add core/tenants/management/commands/seed_tenant.py tests/tenants/test_seed_tenant.py
 git commit -m "feat: add seed_tenant management command for demo data"
 ```
 
