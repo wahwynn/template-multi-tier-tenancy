@@ -14,6 +14,8 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
+from app.tenants.utils import safe_schema
+
 
 class Command(BaseCommand):
     help = "Create a PostgreSQL schema for a tenant and run migrations."
@@ -27,7 +29,7 @@ class Command(BaseCommand):
         if tenant is None:
             raise CommandError(f"Tenant '{slug}' not found in TENANTS config.")
 
-        schema = tenant["schema"]
+        schema = safe_schema(tenant["schema"])
         self.stdout.write(f"Creating schema '{schema}'...")
         with connection.cursor() as cursor:
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")

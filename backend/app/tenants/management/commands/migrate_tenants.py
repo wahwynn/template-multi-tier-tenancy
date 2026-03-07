@@ -15,6 +15,8 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import connection
 
+from app.tenants.utils import safe_schema
+
 
 class Command(BaseCommand):
     help = "Run Django migrations across all (or one) tenant schemas."
@@ -35,7 +37,7 @@ class Command(BaseCommand):
             tenants = [t for t in tenants if t["schema"] == target_schema]
 
         for tenant in tenants:
-            schema = tenant["schema"]
+            schema = safe_schema(tenant["schema"])
             self.stdout.write(f"Migrating schema '{schema}'...")
             with connection.cursor() as cursor:
                 cursor.execute(f"SET search_path TO {schema}, public")
