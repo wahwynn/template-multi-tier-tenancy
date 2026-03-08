@@ -1,9 +1,9 @@
 # Project Metadata
 
 - **Project type**: full-stack
-- **Backend framework**: Django 5.x + Django REST Framework
+- **Backend framework**: Django 6 + Django REST Framework
 - **Frontend framework**: Next.js 15 (App Router) + TypeScript
-- **Database**: PostgreSQL 16 (schema-per-tenant isolation)
+- **Database**: PostgreSQL 16 (three-tier schema isolation: public / shared / tenant)
 - **Cache**: Redis 7
 
 ## Project Structure
@@ -14,4 +14,4 @@ backend/           ← Django backend
 docker-compose.yml ← Local development orchestration
 ```
 
-See `docs/plans/2026-03-07-multi-tenant-scaffold-design.md` for full architecture decisions.
+See `docs/plans/2026-03-07-multi-tenant-scaffold-design.md` for architecture decisions.
