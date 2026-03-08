@@ -3,10 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from core.tenants.middleware import TenantMiddleware, _safe_schema
 from django.http import Http404
 from django.test import RequestFactory, override_settings
-
-from core.tenants.middleware import TenantMiddleware, _safe_schema
 
 TENANTS_CONFIG = [
     {"slug": "acme", "schema": "acme", "domains": ["acme.localhost"], "demo": False},

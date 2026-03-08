@@ -5,8 +5,12 @@ All error responses follow: ``{"error": {"code": "...", "message": "..."}}``.
 
 from __future__ import annotations
 
-from rest_framework.response import Response
+from typing import TYPE_CHECKING
+
 from rest_framework.views import exception_handler
+
+if TYPE_CHECKING:
+    from rest_framework.response import Response
 
 
 def custom_exception_handler(exc: Exception, context: dict) -> Response | None:

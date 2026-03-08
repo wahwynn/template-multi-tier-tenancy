@@ -1,6 +1,6 @@
 """Test settings: extends base settings with SQLite in-memory database."""
 
-from config.settings import *  # noqa: F401, F403
+from config.settings import *  # noqa: F403
 
 DATABASES = {
     "default": {

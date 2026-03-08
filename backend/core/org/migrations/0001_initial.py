@@ -1,4 +1,5 @@
 import uuid
+from typing import ClassVar
 
 import django.db.models.deletion
 from django.conf import settings
@@ -8,11 +9,11 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     initial = True
 
-    dependencies = [
+    dependencies: ClassVar = [
         ("users", "0001_initial"),
     ]
 
-    operations = [
+    operations: ClassVar = [
         migrations.CreateModel(
             name="OrgUnit",
             fields=[
@@ -23,15 +24,24 @@ class Migration(migrations.Migration):
                 (
                     "isolation_policy",
                     models.CharField(
-                        choices=[("open", "Open"), ("isolated", "Isolated"), ("inherit_only", "Inherit Only"), ("visible_only", "Visible Only")],
-                        default="open", max_length=20,
+                        choices=[
+                            ("open", "Open"),
+                            ("isolated", "Isolated"),
+                            ("inherit_only", "Inherit Only"),
+                            ("visible_only", "Visible Only"),
+                        ],
+                        default="open",
+                        max_length=20,
                     ),
                 ),
                 (
                     "parent",
                     models.ForeignKey(
-                        blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
-                        related_name="children", to="org.orgunit",
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="children",
+                        to="org.orgunit",
                     ),
                 ),
             ],
@@ -45,11 +55,26 @@ class Migration(migrations.Migration):
                     "role",
                     models.CharField(
                         choices=[("owner", "Owner"), ("admin", "Admin"), ("member", "Member"), ("viewer", "Viewer")],
-                        default="member", max_length=20,
+                        default="member",
+                        max_length=20,
                     ),
                 ),
-                ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to=settings.AUTH_USER_MODEL)),
-                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="memberships", to="org.orgunit")),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="memberships",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "org_unit",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="memberships",
+                        to="org.orgunit",
+                    ),
+                ),
             ],
             options={
                 "app_label": "org",
@@ -68,13 +93,29 @@ class Migration(migrations.Migration):
                     "role",
                     models.CharField(
                         choices=[("owner", "Owner"), ("admin", "Admin"), ("member", "Member"), ("viewer", "Viewer")],
-                        default="member", max_length=20,
+                        default="member",
+                        max_length=20,
                     ),
                 ),
                 ("expires_at", models.DateTimeField(blank=True, null=True)),
                 ("last_used_at", models.DateTimeField(blank=True, null=True)),
-                ("created_by", models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name="created_api_keys", to=settings.AUTH_USER_MODEL)),
-                ("org_unit", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="api_keys", to="org.orgunit")),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="created_api_keys",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "org_unit",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="api_keys",
+                        to="org.orgunit",
+                    ),
+                ),
             ],
             options={
                 "app_label": "org",

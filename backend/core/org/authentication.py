@@ -38,7 +38,7 @@ class APIKeyAuthentication(BaseAuthentication):
         if not header.startswith("Bearer "):
             return None
 
-        raw_key = header[len("Bearer "):]
+        raw_key = header[len("Bearer ") :]
 
         # JWTs contain dots; raw hex keys do not.
         if "." in raw_key:

@@ -23,22 +23,28 @@ if TYPE_CHECKING:
 class EmailAuthBackend:
     """Django auth backend that accepts email instead of username."""
 
-    def authenticate(self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: object) -> object | None:
-        User = get_user_model()
+    def authenticate(
+        self,
+        request: HttpRequest | None,
+        username: str | None = None,
+        password: str | None = None,
+        **kwargs: object,
+    ) -> object | None:
+        user_model = get_user_model()
         email = kwargs.get("email") or username
         if not email or not password:
             return None
         try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
+            user = user_model.objects.get(email=email)
+        except user_model.DoesNotExist:
             return None
         return user if user.check_password(password) and user.is_active else None
 
     def get_user(self, user_id: object) -> object | None:
-        User = get_user_model()
+        user_model = get_user_model()
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return user_model.objects.get(pk=user_id)
+        except user_model.DoesNotExist:
             return None
 
 

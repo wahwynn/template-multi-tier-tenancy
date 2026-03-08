@@ -21,6 +21,7 @@ def test_seed_tenant_sets_search_path_with_shared(mock_connection, mock_org_unit
     mock_membership.objects.get_or_create.return_value = (MagicMock(), True)
 
     from core.tenants.management.commands.seed_tenant import Command
+
     cmd = Command()
     cmd.handle(slug="demo", verbosity=0)
 

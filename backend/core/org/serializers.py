@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from rest_framework import serializers
 
 from core.org.models import APIKey, Membership, OrgUnit
@@ -10,7 +12,7 @@ class OrgUnitSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrgUnit
-        fields = ["id", "name", "slug", "node_type", "isolation_policy", "parent", "children"]
+        fields: ClassVar = ["id", "name", "slug", "node_type", "isolation_policy", "parent", "children"]
 
     def get_children(self, obj: OrgUnit) -> list:
         return [{"id": str(c.pk), "name": c.name, "slug": c.slug} for c in obj.children.all()]
@@ -19,7 +21,7 @@ class OrgUnitSerializer(serializers.ModelSerializer):
 class MembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = Membership
-        fields = ["id", "user", "org_unit", "role"]
+        fields: ClassVar = ["id", "user", "org_unit", "role"]
 
 
 class APIKeyCreateSerializer(serializers.ModelSerializer):
@@ -29,8 +31,8 @@ class APIKeyCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = APIKey
-        fields = ["id", "name", "prefix", "role", "expires_at", "full_key"]
-        read_only_fields = ["id", "prefix", "full_key"]
+        fields: ClassVar = ["id", "name", "prefix", "role", "expires_at", "full_key"]
+        read_only_fields: ClassVar = ["id", "prefix", "full_key"]
 
     def get_full_key(self, obj: APIKey) -> str | None:
         return self.context.get("full_key")
@@ -41,4 +43,4 @@ class APIKeyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = APIKey
-        fields = ["id", "name", "prefix", "role", "expires_at", "last_used_at"]
+        fields: ClassVar = ["id", "name", "prefix", "role", "expires_at", "last_used_at"]

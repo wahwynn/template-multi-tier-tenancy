@@ -3,12 +3,11 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.core.management.base import CommandError
-from django.test import override_settings
-
 from core.tenants.management.commands.create_tenant import Command as CreateTenantCommand
 from core.tenants.management.commands.migrate_shared import Command as MigrateSharedCommand
 from core.tenants.management.commands.migrate_tenants import Command as MigrateTenantsCommand
+from django.core.management.base import CommandError
+from django.test import override_settings
 
 TENANTS_CONFIG = [
     {"slug": "acme", "schema": "acme", "domains": ["acme.localhost"]},

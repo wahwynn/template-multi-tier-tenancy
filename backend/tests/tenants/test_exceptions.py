@@ -1,11 +1,9 @@
 """Tests for custom exception handler."""
 
-from django.core.exceptions import PermissionDenied
+from core.tenants.exceptions import custom_exception_handler
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.test import APIRequestFactory
-
-from core.tenants.exceptions import custom_exception_handler
 
 
 def test_custom_exception_handler_formats_drf_exception():

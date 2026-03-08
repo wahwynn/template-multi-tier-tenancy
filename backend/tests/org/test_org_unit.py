@@ -1,8 +1,7 @@
 """Tests for OrgUnit model."""
 
-from django.test import TestCase
-
 from core.org.models import IsolationPolicy, OrgUnit
+from django.test import TestCase
 
 
 class TestOrgUnitCreation(TestCase):

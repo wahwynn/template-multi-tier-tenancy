@@ -1,5 +1,5 @@
-from django.urls import include, path
 from core.users.jwt_views import EmailTokenObtainPairView
+from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [

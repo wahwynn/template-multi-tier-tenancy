@@ -102,10 +102,7 @@ class OrgUnit(models.Model):
         # Format the UUID to match how the backend stores it.
         # PostgreSQL stores UUIDs with dashes; SQLite stores them without.
         vendor = connection.vendor
-        if vendor == "sqlite":
-            pk_str = self.pk.hex  # no dashes: "9d3c5bf91d044fa5977443c341e2a266"
-        else:
-            pk_str = str(self.pk)  # with dashes: "9d3c5bf9-1d04-4fa5-..."
+        pk_str = self.pk.hex if vendor == "sqlite" else str(self.pk)
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -143,7 +140,9 @@ class Membership(models.Model):
     class Meta:
         app_label = "org"
         db_table = "memberships"
-        constraints: ClassVar[list[models.BaseConstraint]] = [models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user} in {self.org_unit} ({self.role})"
@@ -170,7 +169,9 @@ class APIKey(models.Model):
     class Meta:
         app_label = "org"
         db_table = "api_keys"
-        constraints: ClassVar[list[models.BaseConstraint]] = [models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.prefix}...)"

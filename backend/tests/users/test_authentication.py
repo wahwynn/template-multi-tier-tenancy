@@ -5,14 +5,13 @@ import secrets
 from datetime import timedelta
 
 import pytest
+from core.org.authentication import APIKeyAuthentication
+from core.org.models import APIKey, OrgUnit, Role
+from core.users.authentication import EmailAuthBackend
+from core.users.models import User
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
-
-from core.users.authentication import EmailAuthBackend, TenantJWTAuthentication
-from core.org.authentication import APIKeyAuthentication
-from core.org.models import APIKey, OrgUnit, Role
-from core.users.models import User
 
 
 def _make_key() -> tuple[str, str, str]:
@@ -30,8 +29,12 @@ class TestAPIKeyAuthentication(TestCase):
         self.unit = OrgUnit.objects.create(name="Acme", slug="acme")
         self.raw_key, prefix, hashed = _make_key()
         self.api_key = APIKey.objects.create(
-            name="Test Key", prefix=prefix, hashed_key=hashed,
-            org_unit=self.unit, role=Role.MEMBER, created_by=self.user,
+            name="Test Key",
+            prefix=prefix,
+            hashed_key=hashed,
+            org_unit=self.unit,
+            role=Role.MEMBER,
+            created_by=self.user,
         )
 
     def test_valid_api_key_authenticates(self):

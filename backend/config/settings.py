@@ -82,7 +82,7 @@ AUTHENTICATION_BACKENDS = ["core.users.authentication.EmailAuthBackend"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.org.authentication.APIKeyAuthentication",   # uses APIKey model from org app
+        "core.org.authentication.APIKeyAuthentication",  # uses APIKey model from org app
         "core.users.authentication.TenantJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
