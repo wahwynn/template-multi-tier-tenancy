@@ -51,13 +51,49 @@ class OrgUnit(models.Model):
         return self.name
 
     def get_ancestors(self) -> list[OrgUnit]:
-        """Return list of ancestors from immediate parent to root."""
-        ancestors: list[OrgUnit] = []
-        current = self.parent
-        while current is not None:
-            ancestors.append(current)
-            current = current.parent
-        return ancestors
+        """Return list of ancestors from immediate parent to root (nearest first).
+
+        Uses a recursive CTE to avoid N+1 queries.
+        """
+        if self.parent_id is None:
+            return []
+
+        from django.db import connection
+
+        pk_val = self.pk.hex if connection.vendor == "sqlite" else str(self.pk)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH RECURSIVE ancestors AS (
+                    SELECT id, parent_id, 1 AS depth
+                    FROM org_units
+                    WHERE id = (SELECT parent_id FROM org_units WHERE id = %s)
+                    UNION ALL
+                    SELECT o.id, o.parent_id, a.depth + 1
+                    FROM org_units o
+                    INNER JOIN ancestors a ON o.id = a.parent_id
+                )
+                SELECT id FROM ancestors ORDER BY depth ASC
+                """,
+                [pk_val],
+            )
+            raw_ids = [row[0] for row in cursor.fetchall()]
+
+        if not raw_ids:
+            return []
+
+        # Normalise IDs (SQLite returns hex without dashes, Postgres returns UUID strings)
+        import uuid as uuid_module
+
+        def normalise(raw: str) -> str:
+            s = str(raw)
+            if "-" not in s:
+                return str(uuid_module.UUID(s))
+            return s
+
+        normalised_ids = [normalise(i) for i in raw_ids]
+        units_by_pk = {str(u.pk): u for u in OrgUnit.objects.filter(pk__in=normalised_ids)}
+        return [units_by_pk[nid] for nid in normalised_ids if nid in units_by_pk]
 
     def get_descendants(self) -> list[OrgUnit]:
         """Return all descendant nodes via recursive CTE."""
@@ -107,7 +143,7 @@ class Membership(models.Model):
     class Meta:
         app_label = "org"
         db_table = "memberships"
-        constraints: ClassVar = [models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")]
+        constraints: ClassVar[list[models.BaseConstraint]] = [models.UniqueConstraint(fields=["user", "org_unit"], name="unique_user_org_unit")]
 
     def __str__(self) -> str:
         return f"{self.user} in {self.org_unit} ({self.role})"
@@ -134,7 +170,7 @@ class APIKey(models.Model):
     class Meta:
         app_label = "org"
         db_table = "api_keys"
-        constraints: ClassVar = [models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")]
+        constraints: ClassVar[list[models.BaseConstraint]] = [models.UniqueConstraint(fields=["prefix", "hashed_key"], name="unique_api_key")]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.prefix}...)"
