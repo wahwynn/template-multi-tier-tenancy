@@ -1,13 +1,65 @@
-"""API key authentication for org-level access."""
+"""API key authentication backend for the org app.
+
+Kept in core.org (not core.users) because it imports APIKey from this app.
+"""
 
 from __future__ import annotations
 
+import hashlib
+from typing import TYPE_CHECKING
+
+from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.request import Request
+from rest_framework.exceptions import AuthenticationFailed
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
+
+    from core.org.models import APIKey
+
+
+class APIKeyToken:
+    """Minimal token-like object carrying the resolved APIKey."""
+
+    def __init__(self, api_key: APIKey) -> None:
+        self.api_key = api_key
+        self.org_unit = api_key.org_unit
+        self.role = api_key.role
 
 
 class APIKeyAuthentication(BaseAuthentication):
-    """Authenticate requests using an API key header."""
+    """Authenticate requests using an API key in the Bearer header."""
 
-    def authenticate(self, request: Request) -> tuple | None:  # type: ignore[override]
-        return None
+    def authenticate_header(self, request: HttpRequest) -> str:
+        return 'Bearer realm="api"'
+
+    def authenticate(self, request: HttpRequest) -> tuple | None:
+        header: str = request.headers.get("Authorization", "")
+        if not header.startswith("Bearer "):
+            return None
+
+        raw_key = header[len("Bearer "):]
+
+        # JWTs contain dots; raw hex keys do not.
+        if "." in raw_key:
+            return None
+
+        if len(raw_key) < 8:
+            return None
+
+        prefix = raw_key[:8]
+        hashed = hashlib.sha256(raw_key.encode()).hexdigest()
+
+        from core.org.models import APIKey  # local import avoids circular
+
+        try:
+            key = APIKey.objects.select_related("org_unit", "created_by").get(prefix=prefix, hashed_key=hashed)
+        except APIKey.DoesNotExist:
+            return None
+
+        if key.expires_at and key.expires_at < timezone.now():
+            raise AuthenticationFailed("API key has expired.")
+
+        APIKey.objects.filter(pk=key.pk).update(last_used_at=timezone.now())
+
+        return key.created_by, APIKeyToken(key)

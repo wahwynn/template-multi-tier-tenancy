@@ -1,34 +1,66 @@
-"""Authentication backends and classes for user authentication."""
+"""Authentication backends for the users app.
+
+- EmailAuthBackend: Django auth backend accepting email instead of username.
+- TenantJWTAuthentication: DRF backend that wraps simplejwt and validates
+  the tenant claim embedded in the token.
+
+Must NOT import simplejwt views/serializers at module level — this file is
+loaded by DRF's DEFAULT_AUTHENTICATION_CLASSES during settings init, and doing
+so would cause a circular import chain through DRF settings.
+"""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.contrib.auth import get_user_model
-from django.contrib.auth.backends import ModelBackend
-from django.http import HttpRequest
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
 
 
-class EmailAuthBackend(ModelBackend):
-    """Authenticate users by email address instead of username."""
+class EmailAuthBackend:
+    """Django auth backend that accepts email instead of username."""
 
-    def authenticate(  # type: ignore[override]
-        self,
-        request: HttpRequest | None,
-        email: str | None = None,
-        password: str | None = None,
-        **kwargs: object,
-    ) -> object:
+    def authenticate(self, request: HttpRequest | None, username: str | None = None, password: str | None = None, **kwargs: object) -> object | None:
         User = get_user_model()
-        if email is None or password is None:
+        email = kwargs.get("email") or username
+        if not email or not password:
             return None
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return None
-        if user.check_password(password) and self.user_can_authenticate(user):
-            return user
-        return None
+        return user if user.check_password(password) and user.is_active else None
+
+    def get_user(self, user_id: object) -> object | None:
+        User = get_user_model()
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
 
 
-class TenantJWTAuthentication(JWTAuthentication):
-    """JWT authentication that is tenant-aware."""
+class TenantJWTAuthentication:
+    """Wraps simplejwt's JWTAuthentication and enforces the tenant claim."""
+
+    def __init__(self) -> None:
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+
+        self._jwt = JWTAuthentication()
+
+    def authenticate(self, request: object) -> tuple | None:
+        result = self._jwt.authenticate(request)
+        if result is None:
+            return None
+
+        user, token = result
+        token_tenant = token.get("tenant")
+        current_tenant = getattr(request, "tenant", None)
+        if token_tenant and current_tenant and token_tenant != current_tenant["slug"]:
+            raise AuthenticationFailed("Token is not valid for this tenant.")
+        return user, token
+
+    def authenticate_header(self, request: object) -> str:
+        return self._jwt.authenticate_header(request)
