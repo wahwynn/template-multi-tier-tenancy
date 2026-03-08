@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+from datetime import timedelta
 
 import pytest
 from django.test import RequestFactory, TestCase
@@ -47,7 +48,7 @@ class TestAPIKeyAuthentication(TestCase):
         assert auth.authenticate(request) is None
 
     def test_expired_api_key_raises_auth_error(self):
-        self.api_key.expires_at = timezone.now() - timezone.timedelta(hours=1)
+        self.api_key.expires_at = timezone.now() - timedelta(hours=1)
         self.api_key.save()
         request = self.factory.get("/", HTTP_AUTHORIZATION=f"Bearer {self.raw_key}")
         auth = APIKeyAuthentication()
