@@ -11,6 +11,8 @@
 ```
 frontend/          ← Next.js frontend
 backend/           ← Django backend
+docs/              ← Architecture design docs and implementation plans
+CONVENTIONS.md     ← Coding standards and development workflow
 docker-compose.yml ← Local development orchestration
 ```
 
